@@ -91,7 +91,11 @@ discord:
 
 ### Run once manually
 ```bash
-python agent.py
+python agent.py -s
+```
+or
+```bash
+python agent.py --single
 ```
 
 Then input your natural-language requirement:
@@ -106,6 +110,38 @@ Output example:
 - AAPL 收跌0.77%，受贸易战新闻影响关注度提升。
 - NVDA 收涨1.10%，银行板块下跌中表现抗跌。
 摘要：两只标的均无显著波动，市场聚焦宏观消息面。
+```
+
+
+
+### Continuous scheduling (Agentic mode)
+
+```bash
+python agent.py
+```
+
+Then input your natural-language requirement:
+```
+please enter the prompt:
+Check TSLA and AAPL every 10 minutes.
+```
+
+Output example:
+```
+[DAILY BRIEF]
+- TSLA +2.3% …
+- AAPL -1.1% …
+Summary: both moved within ±10%, steady intraday.
+[SCHEDULE] 10 minutes interval
+
+...
+
+[DAILY BRIEF]
+- TSLA +2.3% …
+- AAPL -1.1% …
+Summary: both moved within ±10%, steady intraday.
+[SCHEDULE] 10 minutes interval
+
 ```
 
 ---

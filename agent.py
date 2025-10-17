@@ -3,6 +3,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import time
 import schedule
+import argparse
 
 from parser import parse_user_requirement
 from tools.data_tools import get_intraday_price_at, get_previous_close, get_change_pct_vs_prev_close
@@ -93,6 +94,11 @@ def run_scheduler(cfg_rules: dict, cfg_global: dict) -> None:
         print("[SCHED] stopped by user")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Agentic AI Stock Tracker")
+    parser.add_argument("-s", "--single", action="store_true",
+                        help="Run once and exit (skip continuous schedule)")
+    args = parser.parse_args()
+
     with open("config.yaml", "r") as f:
         base_cfg = yaml.safe_load(f)
 
@@ -105,8 +111,8 @@ if __name__ == "__main__":
 
     init_db()
 
-    # run for 1 round
-    run_once(rules, base_cfg)
-
-    # run in schedule
-    run_scheduler(rules, base_cfg)
+    if args.single: # run for 1 round
+        run_once(rules, base_cfg)
+    else: # run in schedule
+        run_once(rules, base_cfg)
+        run_scheduler(rules, base_cfg)
