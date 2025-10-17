@@ -44,7 +44,8 @@ def get_intraday_price_at(ticker: str, target_hhmm: str, timezone_str: str = "Am
         if df_until.empty:
             return None
 
-        return float(df_until["Close"].iloc[-1])
+        ret = float(df_until["Close"].iloc[-1])
+        return ret
     except Exception:
         return None
 

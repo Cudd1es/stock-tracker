@@ -11,7 +11,9 @@ DEFAULTS = {
     "report_style": "summary",  # "summary" or "detailed"
     "news_enabled": True,
     "lookback_days": 5,
-    "report_language": "zh"
+    "report_language": "zh",
+    "schedule_mode": "daily",  # "daily" | "interval"
+    "interval_minutes": 0,  # integer > 0 when schedule_mode == "interval"
 }
 
 ALLOWED_NOTIFY_METHODS = [
@@ -42,6 +44,8 @@ You MUST return ONLY a valid JSON object (no extra text, no code fences) matchin
   "news_enabled": "boolean",             // OPTIONAL
   "lookback_days": "integer"             // OPTIONAL, days to look back for trends (1..60)
   "report_language": "zh|en|jp"            // OPTIONAL, language in the report
+  "schedule_mode": "daily|interval",   // OPTIONAL, default "daily"
+  "interval_minutes": "integer",       // OPTIONAL, required when schedule_mode="interval"
 }}
 
 Rules:
@@ -50,6 +54,8 @@ Rules:
 - If notify method is unclear, choose "console".
 - If schedule is like "after market close", use "16:30".
 - If user mentions daily, assume one run per day at "16:30".
+- If user says "every N minutes", set schedule_mode="interval"
+- If schedule_mode is "interval" and N <= 0 or missing, omit it and let system default.
 - If missing values, omit them so the system can apply defaults.
 - Return ONLY the JSON object, nothing else.
 
@@ -151,6 +157,18 @@ def _validate_and_fix(cfg: Dict[str, Any]) -> Dict[str, Any]:
     if lang not in ALLOWED_LANGUAGES:
         lang = DEFAULTS["report_language"]
 
+    # schedule_mode & interval_minutes
+    mode = (cfg.get("schedule_mode") or "daily").lower().strip()
+    if mode not in ("daily", "interval"):
+        mode = "daily"
+
+    interval = _coerce_int(cfg.get("interval_minutes", 0), 0)
+    if mode == "interval":
+        if interval <= 0 or interval > 24 * 60:
+            interval = 10
+    else:
+        interval = 0
+
     return {
         "tickers": tickers,
         "alert_threshold": float(alert),
@@ -160,6 +178,8 @@ def _validate_and_fix(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "news_enabled": news_enabled,
         "lookback_days": int(lookback),
         "report_language": lang,
+        "schedule_mode": mode,
+        "interval_minutes": int(interval),
     }
 
 def parse_user_requirement(requirement_text: str, model: str = "gpt-4o") -> Dict[str, Any]:

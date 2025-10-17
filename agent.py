@@ -1,9 +1,8 @@
-# agent.py
-# Main orchestration: parse requirement -> schedule -> run daily
-
 import yaml
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import time
+import schedule
 
 from parser import parse_user_requirement
 from tools.data_tools import get_intraday_price_at, get_previous_close, get_change_pct_vs_prev_close
@@ -25,6 +24,7 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
     now_iso = datetime.now(tz).isoformat(timespec="seconds")
 
     for t in cfg_rules["tickers"]:
+        time.sleep(0.3)
         # observe
         price_now = get_intraday_price_at(t, cfg_rules["schedule_time"], cfg_global.get("timezone", "America/Toronto"))
         prev_close = get_previous_close(t)
@@ -68,6 +68,30 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
         notify(method, "[ALERT]\n" + "\n".join(alert_lines), discord_webhook=webhook, mention_id=mention_id)
     notify(method, "[DAILY BRIEF]\n" + brief, discord_webhook=webhook, mention_id=mention_id)
 
+def run_scheduler(cfg_rules: dict, cfg_global: dict) -> None:
+    """
+    scheduled jobs according to schedule_time or interval
+    """
+    mode = cfg_rules.get("schedule_mode", "daily")
+    tz_name = cfg_global.get("timezone", "America/Toronto")
+
+
+    if mode == "interval":
+        interval = int(cfg_rules.get("interval_minutes", 10))
+        print(f"[SCHEDULE] {interval} minutes interval")
+        schedule.every(interval).minutes.do(run_once, cfg_rules=cfg_rules, cfg_global=cfg_global)
+    else:
+        at_time = cfg_rules.get("schedule_time", "9:45")
+        print(f"[SCHEDULE] daily at {at_time} ({tz_name})")
+        schedule.every().day.at(at_time).do(run_once, cfg_rules=cfg_rules, cfg_global=cfg_global)
+
+    try:
+        while True:
+            schedule.run_pending()
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("[SCHED] stopped by user")
+
 if __name__ == "__main__":
     with open("config.yaml", "r") as f:
         base_cfg = yaml.safe_load(f)
@@ -81,4 +105,8 @@ if __name__ == "__main__":
 
     init_db()
 
+    # run for 1 round
     run_once(rules, base_cfg)
+
+    # run in schedule
+    run_scheduler(rules, base_cfg)
