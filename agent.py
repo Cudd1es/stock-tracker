@@ -41,6 +41,8 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
         # news
         if cfg_rules.get("news_enabled", True):
             news_map[t] = fetch_news_headlines(t, topk=3)
+            for i in news_map[t]:
+                print(i["title"], i["link"])
 
     # alerts
     alert_lines = []
@@ -63,27 +65,16 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
     notify(method, "[DAILY BRIEF]\n" + brief, discord_webhook=webhook, mention_id=mention_id)
 
 if __name__ == "__main__":
-    # 1) load base config
     with open("config.yaml", "r") as f:
         base_cfg = yaml.safe_load(f)
 
-    # 2) get user requirement (for demo we can ask input, or call parser with a fixed string)
+    # get user requirements
     print("please enter the prompt:")
     user_text = input().strip()
 
-    from parser import parse_user_requirement
     rules = parse_user_requirement(user_text, model=base_cfg.get("openai_model", "gpt-4o"))
     print(rules)
 
-    # 3) init db
     init_db()
 
-    # 4) run immediately once (MVP). Next step: add scheduler to run daily at rules['schedule_time']
     run_once(rules, base_cfg)
-
-    # You can later integrate schedule:
-    # import schedule, time
-    # schedule.every().day.at(rules['schedule_time']).do(run_once, cfg_rules=rules, cfg_global=base_cfg)
-    # while True:
-    #     schedule.run_pending()
-    #     time.sleep(30)

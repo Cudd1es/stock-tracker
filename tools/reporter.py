@@ -6,18 +6,43 @@ def fetch_news_headlines(ticker: str, topk: int = 3) -> List[Dict[str, str]]:
     """
     Try yfinance's news field; return list of {title, link}.
     """
+    out: List[Dict[str, str]] = []
     try:
         t = yf.Ticker(ticker)
         items = t.news or []
-        out = []
-        for it in items[:topk]:
-            title = it.get("title") or ""
-            link = it.get("link") or ""
-            if title:
-                out.append({"title": title, "link": link})
-        return out
     except Exception:
-        return []
+        return out
+
+    for it in items:
+        title = None
+        link = None
+        content = it.get("content") if isinstance(it, dict) else None
+        if isinstance(content, dict):
+            title = content.get("title") or content.get("summary") or content.get("description")
+            canon = content.get("canonicalUrl") or {}
+            click = content.get("clickThroughUrl") or {}
+            if isinstance(canon, dict):
+                link = canon.get("url") or link
+            if isinstance(click, dict):
+                link = link or click.get("url")
+
+        if not title:
+            title = it.get("title") or it.get("summary") or it.get("description")
+        if not link:
+            link = it.get("link")
+        if title:
+            out.append({"title": str(title), "link": str(link or "")})
+        if len(out) >= topk:
+            break
+        seen = set()
+        deduped = []
+        for x in out:
+            key = x["title"].strip()
+            if key not in seen:
+                seen.add(key)
+                deduped.append(x)
+
+        return deduped[:topk]
 
 def generate_brief(model: str, snapshot: List[Dict[str, Optional[float]]], news_map: Dict[str, List[Dict[str, str]]], threshold: float) -> str:
     """
