@@ -24,6 +24,7 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
     now_iso = datetime.now(tz).isoformat(timespec="seconds")
 
     for t in cfg_rules["tickers"]:
+        # observe
         price_now = get_intraday_price_at(t, cfg_rules["schedule_time"], cfg_global.get("timezone", "America/Toronto"))
         prev_close = get_previous_close(t)
         if price_now is None or prev_close is None:
@@ -35,14 +36,18 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
             "prev_close": prev_close,
             "change_pct": change_pct if change_pct is not None else 0.0
         })
+
+
+        # act
         # persist
         save_price(t, now_iso, price_now, "yfinance")
 
         # news
         if cfg_rules.get("news_enabled", True):
             news_map[t] = fetch_news_headlines(t, topk=3)
+            print(f"[DEBUG][NEWS_COUNT] {t} -> {len(news_map[t])} items")
             for i in news_map[t]:
-                print(i["title"], i["link"])
+                print(f"[DEBUG][NEWS] {t} {i["title"]}, {i["link"]}")
 
     # alerts
     alert_lines = []
