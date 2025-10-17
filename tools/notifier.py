@@ -11,7 +11,7 @@ def send_discord(webhook_url: str, content: str, mention_id: Optional[str] = Non
         requests.post(webhook_url, json=payload, timeout=10)
         return True
     except Exception as e:
-        print(f"Discord通知失败: {str(e)}")
+        print(f"Discord notification failed: {str(e)}")
         return False
 
 def notify(method: str, message: str, discord_webhook: Optional[str], mention_id: Optional[str] = None) -> None:
