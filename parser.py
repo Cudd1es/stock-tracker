@@ -11,6 +11,7 @@ DEFAULTS = {
     "report_style": "summary",  # "summary" or "detailed"
     "news_enabled": True,
     "lookback_days": 5,
+    "report_language": "zh"
 }
 
 ALLOWED_NOTIFY_METHODS = [
@@ -20,6 +21,12 @@ ALLOWED_NOTIFY_METHODS = [
 ALLOWED_REPORT_STYLES = [
     "summary",
     "detailed"
+]
+
+ALLOWED_LANGUAGES = [
+    "en",
+    "zh",
+    "jp"
 ]
 
 PARSER_PROMPT = """You are a strict configuration extractor for a stock-tracking agent.
@@ -34,6 +41,7 @@ You MUST return ONLY a valid JSON object (no extra text, no code fences) matchin
   "report_style": "summary|detailed",    // OPTIONAL
   "news_enabled": "boolean",             // OPTIONAL
   "lookback_days": "integer"             // OPTIONAL, days to look back for trends (1..60)
+  "report_language": "zh|en|jp"            // OPTIONAL, language in the report
 }}
 
 Rules:
@@ -138,6 +146,11 @@ def _validate_and_fix(cfg: Dict[str, Any]) -> Dict[str, Any]:
     if lookback < 1 or lookback > 60:
         lookback = DEFAULTS["lookback_days"]
 
+    # report_language
+    lang = (cfg.get("report_language", DEFAULTS["report_language"])).lower().strip()
+    if lang not in ALLOWED_LANGUAGES:
+        lang = DEFAULTS["report_language"]
+
     return {
         "tickers": tickers,
         "alert_threshold": float(alert),
@@ -146,6 +159,7 @@ def _validate_and_fix(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "report_style": style,
         "news_enabled": news_enabled,
         "lookback_days": int(lookback),
+        "report_language": lang,
     }
 
 def parse_user_requirement(requirement_text: str, model: str = "gpt-4o") -> Dict[str, Any]:

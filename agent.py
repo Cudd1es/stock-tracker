@@ -18,6 +18,7 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
     tz = ZoneInfo(cfg_global.get("timezone", "America/Toronto"))
     model = cfg_global.get("openai_model", "gpt-4o")
     threshold = float(cfg_rules["alert_threshold"])
+    language = cfg_rules.get("report_language", "zh")
 
     snapshot = []
     news_map = {}
@@ -45,9 +46,7 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
         # news
         if cfg_rules.get("news_enabled", True):
             news_map[t] = fetch_news_headlines(t, topk=3)
-            print(f"[DEBUG][NEWS_COUNT] {t} -> {len(news_map[t])} items")
-            for i in news_map[t]:
-                print(f"[DEBUG][NEWS] {t} {i["title"]}, {i["link"]}")
+
 
     # alerts
     alert_lines = []
@@ -56,7 +55,7 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
             alert_lines.append(f"{row['ticker']} moved {row['change_pct']:.2f}% (now {row['price_now']:.2f})")
 
     # brief
-    brief = generate_brief(model, snapshot, news_map, threshold)
+    brief = generate_brief(model, snapshot, news_map, threshold, language)
 
     # notify
     with open("config.yaml", "r") as f:

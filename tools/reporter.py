@@ -55,12 +55,17 @@ def fetch_news_headlines(ticker: str, topk: int = 3) -> List[Dict[str, str]]:
 
     return deduped[:topk]
 
-def generate_brief(model: str, snapshot: List[Dict[str, Optional[float]]], news_map: Dict[str, List[Dict[str, str]]], threshold: float) -> str:
+def generate_brief(model: str, snapshot: List[Dict[str, Optional[float]]], news_map: Dict[str, List[Dict[str, str]]], threshold: float, language: str = "zh") -> str:
     """
     ask llm to generate a brief report
     snapshot: list of {ticker, price_now, prev_close, change_pct}
     news_map: ticker -> list of {title, link}
     """
+    language_dict = {
+        "zh": "zh-CN",
+        "en": "en",
+        "jp": "jp-JP",
+    }
     lines = []
     for row in snapshot:
         t = row["ticker"]
@@ -72,6 +77,7 @@ def generate_brief(model: str, snapshot: List[Dict[str, Optional[float]]], news_
         for n in news:
             lines.append(f"  - {n['title']} ({n.get('link', '')})")
     context = "\n".join(lines)
+    lang_name = language_dict[language]
 
     prompt = f"""Write a concise end-of-day style brief (max 6 bullet points) for the following tickers.
 Emphasize any move beyond ±{threshold:.1f}% . Be neutral and factual. Avoid investment advice.
@@ -79,6 +85,6 @@ Emphasize any move beyond ±{threshold:.1f}% . Be neutral and factual. Avoid inv
 DATA:
 {context}
 
-Output in Chinese, use clear bullets and a one-line summary at the end.
+Output in {lang_name}, use clear bullets and a one-line summary at the end.
 """
     return ask_llm(prompt, model=model)
