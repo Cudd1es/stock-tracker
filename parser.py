@@ -2,7 +2,7 @@ import json
 import re
 from typing import Any, Dict, List
 
-from agent import ask_llm
+from llm_agent import ask_llm
 
 DEFAULTS = {
     "alert_threshold": 5.0,

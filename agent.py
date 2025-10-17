@@ -1,28 +1,89 @@
-from dotenv import load_dotenv
-import os
-from openai import OpenAI
+# agent.py
+# Main orchestration: parse requirement -> schedule -> run daily
 
-# load llm api key in .env
-load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
+import yaml
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
-client = OpenAI(api_key=api_key)
+from parser import parse_user_requirement
+from tools.data_tools import get_intraday_price_at, get_previous_close, get_change_pct_vs_prev_close
+from tools.storage import init_db, save_price
+from tools.notifier import notify
+from tools.reporter import fetch_news_headlines, generate_brief
 
-def ask_llm(prompt: str, model: str = "gpt-4o") -> str:
+def run_once(cfg_rules: dict, cfg_global: dict) -> None:
     """
-    send prompt to openai model and return its output
+    One scheduled run at target time.
     """
-    try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": "You are a professional stock-tracking assistant."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7,
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        print(f"[LLM Error] {e}")
-        return ""
+    tz = ZoneInfo(cfg_global.get("timezone", "America/Toronto"))
+    model = cfg_global.get("openai_model", "gpt-4o")
+    threshold = float(cfg_rules["alert_threshold"])
 
+    snapshot = []
+    news_map = {}
+    now_iso = datetime.now(tz).isoformat(timespec="seconds")
+
+    for t in cfg_rules["tickers"]:
+        price_now = get_intraday_price_at(t, cfg_rules["schedule_time"], cfg_global.get("timezone", "America/Toronto"))
+        prev_close = get_previous_close(t)
+        if price_now is None or prev_close is None:
+            continue
+        change_pct = get_change_pct_vs_prev_close(t, price_now)
+        snapshot.append({
+            "ticker": t,
+            "price_now": price_now,
+            "prev_close": prev_close,
+            "change_pct": change_pct if change_pct is not None else 0.0
+        })
+        # persist
+        save_price(t, now_iso, price_now, "yfinance")
+
+        # news
+        if cfg_rules.get("news_enabled", True):
+            news_map[t] = fetch_news_headlines(t, topk=3)
+
+    # alerts
+    alert_lines = []
+    for row in snapshot:
+        if row["change_pct"] is not None and abs(row["change_pct"]) >= threshold:
+            alert_lines.append(f"{row['ticker']} moved {row['change_pct']:.2f}% (now {row['price_now']:.2f})")
+
+    # brief
+    brief = generate_brief(model, snapshot, news_map, threshold)
+
+    # notify
+    with open("config.yaml", "r") as f:
+        base_cfg = yaml.safe_load(f)
+    webhook = (base_cfg.get("discord") or {}).get("webhook_url")
+    mention_id = (base_cfg.get("discord") or {}).get("mention_id")
+    method = cfg_rules.get("notify_method", "console")
+
+    if alert_lines:
+        notify(method, "[ALERT]\n" + "\n".join(alert_lines), discord_webhook=webhook, mention_id=mention_id)
+    notify(method, "[DAILY BRIEF]\n" + brief, discord_webhook=webhook, mention_id=mention_id)
+
+if __name__ == "__main__":
+    # 1) load base config
+    with open("config.yaml", "r") as f:
+        base_cfg = yaml.safe_load(f)
+
+    # 2) get user requirement (for demo we can ask input, or call parser with a fixed string)
+    print("please enter the prompt:")
+    user_text = input().strip()
+
+    from parser import parse_user_requirement
+    rules = parse_user_requirement(user_text, model=base_cfg.get("openai_model", "gpt-4o"))
+    print(rules)
+
+    # 3) init db
+    init_db()
+
+    # 4) run immediately once (MVP). Next step: add scheduler to run daily at rules['schedule_time']
+    run_once(rules, base_cfg)
+
+    # You can later integrate schedule:
+    # import schedule, time
+    # schedule.every().day.at(rules['schedule_time']).do(run_once, cfg_rules=rules, cfg_global=base_cfg)
+    # while True:
+    #     schedule.run_pending()
+    #     time.sleep(30)
