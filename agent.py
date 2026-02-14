@@ -1,9 +1,13 @@
 import yaml
+import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import time
 import schedule
 import argparse
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from parser import parse_user_requirement
 from tools.data_tools import get_intraday_price_at, get_previous_close, get_change_pct_vs_prev_close
@@ -59,10 +63,8 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
     brief = generate_brief(model, snapshot, news_map, threshold, language)
 
     # notify
-    with open("config.yaml", "r") as f:
-        base_cfg = yaml.safe_load(f)
-    webhook = (base_cfg.get("discord") or {}).get("webhook_url")
-    mention_id = (base_cfg.get("discord") or {}).get("mention_id")
+    webhook = os.getenv("DISCORD_WEBHOOK_URL")
+    mention_id = os.getenv("DISCORD_MENTION_ID")
     method = cfg_rules.get("notify_method", "console")
 
     if alert_lines:

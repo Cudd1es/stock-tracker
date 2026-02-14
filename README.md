@@ -63,14 +63,18 @@ pip install -r requirements.txt
 
 ## Configuration
 
-### 1. API Key
-Create a `.env` file in the project root:
+### 1. Secrets (`.env`)
+Create a `.env` file in the project root with all sensitive credentials:
 ```
 OPENAI_API_KEY=sk-your-key-here
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/xxxx/xxxx
+DISCORD_MENTION_ID=your-discord-user-id
 ```
 
+> **Note:** `.env` is git-ignored and will not be committed.
+
 ### 2. Global Config (`config.yaml`)
-See `config_example.yaml`:
+Non-sensitive settings only. See `config_example.yaml`:
 
 ```yaml
 openai_model: gpt-4o
@@ -79,9 +83,6 @@ defaults:
   alert_threshold: 5.0
   schedule_time: "16:30"
   notify_method: "console"
-discord:
-  webhook_url: "https://discord.com/api/webhooks/xxxx/xxxx"
-  mention_id: "YOUR_DISCORD_ID"   # optional
 ```
 
 

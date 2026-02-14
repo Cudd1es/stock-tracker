@@ -2,13 +2,8 @@
 openai_model: gpt-4o
 timezone: America/Toronto
 
-# Fallback defaults if user doesn’t specify
+# Fallback defaults if user doesn't specify
 defaults:
   alert_threshold: 5.0
   schedule_time: "16:30"
   notify_method: "console"
-
-# Notification secrets
-discord:
-  webhook_url: "https://discord.com/api/webhooks/xxxx/xxxx",
-    mention_id: "xxxxxxxx"
