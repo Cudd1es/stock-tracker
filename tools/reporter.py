@@ -64,7 +64,7 @@ def generate_brief(model: str, snapshot: List[Dict[str, Optional[float]]], news_
     language_dict = {
         "zh": "zh-CN",
         "en": "en",
-        "jp": "jp-JP",
+        "ja": "ja-JP",
     }
     lines = []
     for row in snapshot:
@@ -77,7 +77,7 @@ def generate_brief(model: str, snapshot: List[Dict[str, Optional[float]]], news_
         for n in news:
             lines.append(f"  - {n['title']} ({n.get('link', '')})")
     context = "\n".join(lines)
-    lang_name = language_dict[language]
+    lang_name = language_dict.get(language, "en")
 
     prompt = f"""Write a concise end-of-day style brief (max 6 bullet points) for the following tickers.
 Emphasize any move beyond ±{threshold:.1f}% . Be neutral and factual. Avoid investment advice.

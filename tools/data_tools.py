@@ -36,7 +36,7 @@ def get_intraday_price_at(ticker: str, target_hhmm: str, timezone_str: str = "Am
             if df is None or df.empty:
                 return None
 
-        df_local = df.tz_convert(tz) if df.index.tz is not None else df.tz_localize(tz)
+        df_local = df.tz_convert(tz) if df.index.tz is not None else df.tz_localize("UTC").tz_convert(tz)
         df_today = df_local[df_local.index.date == target_dt.date()]
         if df_today.empty:
             return None

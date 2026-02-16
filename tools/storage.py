@@ -29,9 +29,7 @@ def get_conn() -> sqlite3.Connection:
 def init_db() -> None:
     conn = get_conn()
     with conn:
-        for stmt in DDL.strip().split(";\n\n"):
-            if stmt.strip():
-                conn.execute(stmt)
+        conn.executescript(DDL)
     conn.close()
 
 def save_price(ticker: str, ts_iso: str, price: float, source: str = "yfinance") -> None:

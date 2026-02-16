@@ -2,7 +2,8 @@ import requests
 from typing import Optional
 
 def send_discord(webhook_url: str, content: str, mention_id: Optional[str] = None) -> bool:
-    content = f"<@{mention_id}> " + content
+    if mention_id:
+        content = f"<@{mention_id}> " + content
     try:
         payload = {
             "content": content,

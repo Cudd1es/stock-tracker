@@ -6,6 +6,9 @@ from openai import OpenAI
 load_dotenv()
 api_key = os.getenv("OPENAI_API_KEY")
 
+if not api_key:
+    print("[WARNING] OPENAI_API_KEY is not set. LLM calls will fail.")
+
 client = OpenAI(api_key=api_key)
 
 def ask_llm(prompt: str, model: str = "gpt-4o") -> str:

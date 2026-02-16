@@ -28,7 +28,7 @@ ALLOWED_REPORT_STYLES = [
 ALLOWED_LANGUAGES = [
     "en",
     "zh",
-    "jp"
+    "ja"
 ]
 
 PARSER_PROMPT = """You are a strict configuration extractor for a stock-tracking agent.
@@ -43,7 +43,7 @@ You MUST return ONLY a valid JSON object (no extra text, no code fences) matchin
   "report_style": "summary|detailed",    // OPTIONAL
   "news_enabled": "boolean",             // OPTIONAL
   "lookback_days": "integer"             // OPTIONAL, days to look back for trends (1..60)
-  "report_language": "zh|en|jp"            // OPTIONAL, language in the report
+  "report_language": "zh|en|ja"            // OPTIONAL, language in the report
   "schedule_mode": "daily|interval",   // OPTIONAL, default "daily"
   "interval_minutes": "integer",       // OPTIONAL, required when schedule_mode="interval"
 }}

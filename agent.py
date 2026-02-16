@@ -5,12 +5,9 @@ from zoneinfo import ZoneInfo
 import time
 import schedule
 import argparse
-from dotenv import load_dotenv
-
-load_dotenv()
 
 from parser import parse_user_requirement
-from tools.data_tools import get_intraday_price_at, get_previous_close, get_change_pct_vs_prev_close
+from tools.data_tools import get_intraday_price_at, get_previous_close
 from tools.storage import init_db, save_price
 from tools.notifier import notify
 from tools.reporter import fetch_news_headlines, generate_brief
@@ -19,10 +16,15 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
     """
     One scheduled run at target time.
     """
-    tz = ZoneInfo(cfg_global.get("timezone", "America/Toronto"))
-    model = cfg_global.get("openai_model", "gpt-4o")
+    # define default parameters
+    default_tz = cfg_global.get("timezone", "America/Toronto")
+    default_model = cfg_global.get("openai_model", "gpt-4o")
+    default_language = "zh"
+
+    tz = ZoneInfo(default_tz)
+    model = default_model
     threshold = float(cfg_rules["alert_threshold"])
-    language = cfg_rules.get("report_language", "zh")
+    language = cfg_rules.get("report_language", default_language)
 
     snapshot = []
     news_map = {}
@@ -31,22 +33,26 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
     for t in cfg_rules["tickers"]:
         time.sleep(0.3)
         # observe
-        price_now = get_intraday_price_at(t, cfg_rules["schedule_time"], cfg_global.get("timezone", "America/Toronto"))
+        price_now = get_intraday_price_at(t, cfg_rules["schedule_time"], default_tz)
         prev_close = get_previous_close(t)
         if price_now is None or prev_close is None:
+            print(f"Warning: Could not get data for ticker {t}. Skipping.")
             continue
-        change_pct = get_change_pct_vs_prev_close(t, price_now)
+        change_pct = ((price_now - prev_close) / prev_close * 100.0) if prev_close != 0 else 0.0
         snapshot.append({
             "ticker": t,
             "price_now": price_now,
             "prev_close": prev_close,
-            "change_pct": change_pct if change_pct is not None else 0.0
+            "change_pct": change_pct,
         })
 
 
         # act
         # persist
-        save_price(t, now_iso, price_now, "yfinance")
+        try:
+            save_price(t, now_iso, price_now, "yfinance")
+        except Exception as e:
+            print(f"Error saving price for {t}: {e}")
 
         # news
         if cfg_rules.get("news_enabled", True):
@@ -75,17 +81,25 @@ def run_scheduler(cfg_rules: dict, cfg_global: dict) -> None:
     """
     scheduled jobs according to schedule_time or interval
     """
-    mode = cfg_rules.get("schedule_mode", "daily")
-    tz_name = cfg_global.get("timezone", "America/Toronto")
+
+    # define default parameters
+    default_tz = cfg_global.get("timezone", "America/Toronto")
+    default_language = "zh" 
+    default_mode = "daily"
+    default_interval = 10
+    default_at_time = "9:45"
+
+    mode = cfg_rules.get("schedule_mode", default_mode)
+    tz = default_tz
 
 
     if mode == "interval":
-        interval = int(cfg_rules.get("interval_minutes", 10))
+        interval = int(cfg_rules.get("interval_minutes", default_interval))
         print(f"[SCHEDULE] {interval} minutes interval")
         schedule.every(interval).minutes.do(run_once, cfg_rules=cfg_rules, cfg_global=cfg_global)
     else:
-        at_time = cfg_rules.get("schedule_time", "9:45")
-        print(f"[SCHEDULE] daily at {at_time} ({tz_name})")
+        at_time = cfg_rules.get("schedule_time", default_at_time)
+        print(f"[SCHEDULE] daily at {at_time} ({tz})")
         schedule.every().day.at(at_time).do(run_once, cfg_rules=cfg_rules, cfg_global=cfg_global)
 
     try:
@@ -104,11 +118,12 @@ if __name__ == "__main__":
     with open("config.yaml", "r") as f:
         base_cfg = yaml.safe_load(f)
 
+    model = base_cfg.get("openai_model", "gpt-4o")
     # get user requirements
     print("please enter the prompt:")
     user_text = input().strip()
 
-    rules = parse_user_requirement(user_text, model=base_cfg.get("openai_model", "gpt-4o"))
+    rules = parse_user_requirement(user_text, model=model)
     print(rules)
 
     init_db()
