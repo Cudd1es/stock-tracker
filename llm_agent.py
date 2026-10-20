@@ -4,19 +4,27 @@ from openai import OpenAI
 
 # load llm api key in .env
 load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
 
-if not api_key:
-    print("[WARNING] OPENAI_API_KEY is not set. LLM calls will fail.")
+_client = None
 
-client = OpenAI(api_key=api_key)
+def _get_client() -> OpenAI:
+    """
+    create the openai client on first use, so importing this module never fails
+    """
+    global _client
+    if _client is None:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY is not set")
+        _client = OpenAI(api_key=api_key)
+    return _client
 
 def ask_llm(prompt: str, model: str = "gpt-4o") -> str:
     """
     send prompt to openai model and return its output
     """
     try:
-        response = client.chat.completions.create(
+        response = _get_client().chat.completions.create(
             model=model,
             messages=[
                 {"role": "system", "content": "You are a professional stock-tracking assistant."},
@@ -27,4 +35,3 @@ def ask_llm(prompt: str, model: str = "gpt-4o") -> str:
     except Exception as e:
         print(f"[LLM Error] {e}")
         return ""
-

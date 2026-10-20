@@ -153,12 +153,12 @@ def _validate_and_fix(cfg: Dict[str, Any]) -> Dict[str, Any]:
         lookback = DEFAULTS["lookback_days"]
 
     # report_language
-    lang = (cfg.get("report_language", DEFAULTS["report_language"])).lower().strip()
+    lang = str(cfg.get("report_language") or DEFAULTS["report_language"]).lower().strip()
     if lang not in ALLOWED_LANGUAGES:
         lang = DEFAULTS["report_language"]
 
     # schedule_mode & interval_minutes
-    mode = (cfg.get("schedule_mode") or "daily").lower().strip()
+    mode = str(cfg.get("schedule_mode") or "daily").lower().strip()
     if mode not in ("daily", "interval"):
         mode = "daily"
 
