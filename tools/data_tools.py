@@ -50,7 +50,11 @@ def get_intraday_price_at(ticker: str, target_hhmm: str, timezone_str: str = "Am
         if df_until.empty:
             return None
 
-        ret = float(df_until["Close"].iloc[-1])
+        close = df_until["Close"]
+        if close.ndim > 1:
+            # yf.download returns (Price, Ticker) MultiIndex columns even for one ticker
+            close = close.iloc[:, 0]
+        ret = float(close.iloc[-1])
         return ret
     except Exception:
         logger.warning("failed to fetch intraday price for %s", ticker, exc_info=True)

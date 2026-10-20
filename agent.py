@@ -5,11 +5,12 @@ from zoneinfo import ZoneInfo
 import time
 import schedule
 import argparse
+from typing import List, Optional
 import logging
 
 from parser import parse_user_requirement
 from tools.data_tools import get_intraday_price_at, get_previous_close, get_lookback_change_pct
-from tools.storage import init_db, save_price
+from tools.storage import init_db, save_price, record_run
 from tools.notifier import notify
 from tools.reporter import fetch_news_headlines, generate_brief
 
@@ -34,7 +35,32 @@ def target_time_for(cfg_rules: dict, tz: ZoneInfo) -> str:
 
 def run_once(cfg_rules: dict, cfg_global: dict) -> None:
     """
-    One scheduled run at target time.
+    One scheduled run at target time; records the outcome in the runs table.
+    """
+    tz = ZoneInfo(cfg_global.get("timezone", "America/Toronto"))
+    now_iso = datetime.now(tz).isoformat(timespec="seconds")
+    try:
+        skipped = _execute_run(cfg_rules, cfg_global, now_iso)
+    except Exception as e:
+        _safe_record_run(now_iso, "error", repr(e)[:500])
+        raise
+
+    if len(skipped) == len(cfg_rules["tickers"]):
+        _safe_record_run(now_iso, "no_data")
+    elif skipped:
+        _safe_record_run(now_iso, "partial", ",".join(skipped))
+    else:
+        _safe_record_run(now_iso, "ok")
+
+def _safe_record_run(run_ts: str, status: str, note: Optional[str] = None) -> None:
+    try:
+        record_run(run_ts, status, note)
+    except Exception:
+        logger.exception("failed to record run status %s", status)
+
+def _execute_run(cfg_rules: dict, cfg_global: dict, now_iso: str) -> List[str]:
+    """
+    observe, persist, report and notify; returns the tickers that were skipped.
     """
     # define default parameters
     default_tz = cfg_global.get("timezone", "America/Toronto")
@@ -49,8 +75,8 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
     lookback_days = int(cfg_rules.get("lookback_days", 5))
 
     snapshot = []
+    skipped = []
     news_map = {}
-    now_iso = datetime.now(tz).isoformat(timespec="seconds")
     target_hhmm = target_time_for(cfg_rules, tz)
 
     for t in cfg_rules["tickers"]:
@@ -60,6 +86,7 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
         prev_close = get_previous_close(t)
         if price_now is None or prev_close is None:
             logger.warning("could not get data for ticker %s, skipping", t)
+            skipped.append(t)
             continue
         change_pct = ((price_now - prev_close) / prev_close * 100.0) if prev_close != 0 else 0.0
         snapshot.append({
@@ -83,6 +110,14 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
             news_map[t] = fetch_news_headlines(t, topk=3)
 
 
+    webhook = os.getenv("DISCORD_WEBHOOK_URL")
+    mention_id = os.getenv("DISCORD_MENTION_ID")
+    method = cfg_rules.get("notify_method", "console")
+
+    if not snapshot:
+        notify(method, "[DAILY BRIEF]\nNo market data available.", discord_webhook=webhook, mention_id=mention_id)
+        return skipped
+
     # alerts
     alert_lines = []
     for row in snapshot:
@@ -93,13 +128,10 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
     brief = generate_brief(model, snapshot, news_map, threshold, language, style, lookback_days)
 
     # notify
-    webhook = os.getenv("DISCORD_WEBHOOK_URL")
-    mention_id = os.getenv("DISCORD_MENTION_ID")
-    method = cfg_rules.get("notify_method", "console")
-
     if alert_lines:
         notify(method, "[ALERT]\n" + "\n".join(alert_lines), discord_webhook=webhook, mention_id=mention_id)
     notify(method, "[DAILY BRIEF]\n" + brief, discord_webhook=webhook, mention_id=mention_id)
+    return skipped
 
 def run_scheduler(cfg_rules: dict, cfg_global: dict) -> None:
     """

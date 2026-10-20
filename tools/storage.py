@@ -40,3 +40,12 @@ def save_price(ticker: str, ts_iso: str, price: float, source: str = "yfinance")
             (ticker, ts_iso, price, source)
         )
     conn.close()
+
+def record_run(run_ts: str, status: str, note: Optional[str] = None) -> None:
+    conn = get_conn()
+    with conn:
+        conn.execute(
+            "INSERT INTO runs (run_ts, status, note) VALUES (?, ?, ?)",
+            (run_ts, status, note)
+        )
+    conn.close()
