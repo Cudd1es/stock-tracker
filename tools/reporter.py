@@ -1,6 +1,9 @@
+import logging
 from typing import Dict, List, Optional
 import yfinance as yf
 from llm_agent import ask_llm
+
+logger = logging.getLogger(__name__)
 
 def fetch_news_headlines(ticker: str, topk: int = 3) -> List[Dict[str, str]]:
     """
@@ -12,6 +15,7 @@ def fetch_news_headlines(ticker: str, topk: int = 3) -> List[Dict[str, str]]:
         t = yf.Ticker(ticker)
         items = t.news or []
     except Exception:
+        logger.warning("failed to fetch news for %s", ticker, exc_info=True)
         return out
 
     for it in items:

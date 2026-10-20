@@ -1,7 +1,10 @@
-from datetime import datetime, time as dtime
+import logging
+from datetime import datetime
 from zoneinfo import ZoneInfo
 import yfinance as yf
-from typing import Optional, Tuple
+from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 def get_previous_close(ticker: str) -> Optional[float]:
     """
@@ -17,6 +20,7 @@ def get_previous_close(ticker: str) -> Optional[float]:
         else:
             return float(info["Close"].iloc[-1])
     except Exception:
+        logger.warning("failed to fetch previous close for %s", ticker, exc_info=True)
         return None
 
 
@@ -47,6 +51,7 @@ def get_intraday_price_at(ticker: str, target_hhmm: str, timezone_str: str = "Am
         ret = float(df_until["Close"].iloc[-1])
         return ret
     except Exception:
+        logger.warning("failed to fetch intraday price for %s", ticker, exc_info=True)
         return None
 
 def get_change_pct_vs_prev_close(ticker: str, price_now: float) -> Optional[float]:

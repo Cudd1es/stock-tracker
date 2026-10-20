@@ -1,9 +1,12 @@
 from dotenv import load_dotenv
+import logging
 import os
 from openai import OpenAI
 
 # load llm api key in .env
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 _client = None
 
@@ -33,5 +36,5 @@ def ask_llm(prompt: str, model: str = "gpt-4o") -> str:
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        print(f"[LLM Error] {e}")
+        logger.error("LLM call failed: %s", e)
         return ""

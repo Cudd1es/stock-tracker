@@ -1,5 +1,8 @@
+import logging
 import requests
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 def send_discord(webhook_url: str, content: str, mention_id: Optional[str] = None) -> bool:
     if mention_id:
@@ -12,7 +15,7 @@ def send_discord(webhook_url: str, content: str, mention_id: Optional[str] = Non
         requests.post(webhook_url, json=payload, timeout=10)
         return True
     except Exception as e:
-        print(f"Discord notification failed: {str(e)}")
+        logger.error("discord notification failed: %s", e)
         return False
 
 def notify(method: str, message: str, discord_webhook: Optional[str], mention_id: Optional[str] = None) -> None:
@@ -20,6 +23,6 @@ def notify(method: str, message: str, discord_webhook: Optional[str], mention_id
     if method == "discord" and discord_webhook:
         ok = send_discord(discord_webhook, message, mention_id)
         if not ok:
-            print("[NOTIFY][discord][fail] Discord notify failed]", message)
+            print("[NOTIFY][console]", message)
     else:
         print("[NOTIFY][console]", message)

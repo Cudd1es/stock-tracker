@@ -5,12 +5,24 @@ from zoneinfo import ZoneInfo
 import time
 import schedule
 import argparse
+import logging
 
 from parser import parse_user_requirement
 from tools.data_tools import get_intraday_price_at, get_previous_close
 from tools.storage import init_db, save_price
 from tools.notifier import notify
 from tools.reporter import fetch_news_headlines, generate_brief
+
+logger = logging.getLogger(__name__)
+
+def setup_logging(level: str = "INFO") -> None:
+    """
+    configure root logging once, at program entry
+    """
+    logging.basicConfig(
+        level=getattr(logging, str(level).upper(), logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
 
 def run_once(cfg_rules: dict, cfg_global: dict) -> None:
     """
@@ -36,7 +48,7 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
         price_now = get_intraday_price_at(t, cfg_rules["schedule_time"], default_tz)
         prev_close = get_previous_close(t)
         if price_now is None or prev_close is None:
-            print(f"Warning: Could not get data for ticker {t}. Skipping.")
+            logger.warning("could not get data for ticker %s, skipping", t)
             continue
         change_pct = ((price_now - prev_close) / prev_close * 100.0) if prev_close != 0 else 0.0
         snapshot.append({
@@ -51,8 +63,8 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
         # persist
         try:
             save_price(t, now_iso, price_now, "yfinance")
-        except Exception as e:
-            print(f"Error saving price for {t}: {e}")
+        except Exception:
+            logger.exception("error saving price for %s", t)
 
         # news
         if cfg_rules.get("news_enabled", True):
@@ -118,13 +130,15 @@ if __name__ == "__main__":
     with open("config.yaml", "r") as f:
         base_cfg = yaml.safe_load(f)
 
+    setup_logging(base_cfg.get("log_level", "INFO"))
+
     model = base_cfg.get("openai_model", "gpt-4o")
     # get user requirements
     print("please enter the prompt:")
     user_text = input().strip()
 
     rules = parse_user_requirement(user_text, model=model)
-    print(rules)
+    logger.info("parsed rules: %s", rules)
 
     init_db()
 
