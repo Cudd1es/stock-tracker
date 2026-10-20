@@ -24,6 +24,14 @@ def setup_logging(level: str = "INFO") -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
+def target_time_for(cfg_rules: dict, tz: ZoneInfo) -> str:
+    """
+    HH:MM to price at: now for interval mode, schedule_time for daily mode.
+    """
+    if cfg_rules.get("schedule_mode") == "interval":
+        return datetime.now(tz).strftime("%H:%M")
+    return cfg_rules["schedule_time"]
+
 def run_once(cfg_rules: dict, cfg_global: dict) -> None:
     """
     One scheduled run at target time.
@@ -41,11 +49,12 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
     snapshot = []
     news_map = {}
     now_iso = datetime.now(tz).isoformat(timespec="seconds")
+    target_hhmm = target_time_for(cfg_rules, tz)
 
     for t in cfg_rules["tickers"]:
         time.sleep(0.3)
         # observe
-        price_now = get_intraday_price_at(t, cfg_rules["schedule_time"], default_tz)
+        price_now = get_intraday_price_at(t, target_hhmm, default_tz)
         prev_close = get_previous_close(t)
         if price_now is None or prev_close is None:
             logger.warning("could not get data for ticker %s, skipping", t)
@@ -96,10 +105,9 @@ def run_scheduler(cfg_rules: dict, cfg_global: dict) -> None:
 
     # define default parameters
     default_tz = cfg_global.get("timezone", "America/Toronto")
-    default_language = "zh" 
     default_mode = "daily"
     default_interval = 10
-    default_at_time = "9:45"
+    default_at_time = "09:45"
 
     mode = cfg_rules.get("schedule_mode", default_mode)
     tz = default_tz
@@ -112,7 +120,7 @@ def run_scheduler(cfg_rules: dict, cfg_global: dict) -> None:
     else:
         at_time = cfg_rules.get("schedule_time", default_at_time)
         print(f"[SCHEDULE] daily at {at_time} ({tz})")
-        schedule.every().day.at(at_time).do(run_once, cfg_rules=cfg_rules, cfg_global=cfg_global)
+        schedule.every().day.at(at_time, tz).do(run_once, cfg_rules=cfg_rules, cfg_global=cfg_global)
 
     try:
         while True:
