@@ -1,20 +1,40 @@
 import logging
-from datetime import datetime
+import time
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
+import pandas as pd
 import yfinance as yf
+from yfinance.exceptions import YFTickerMissingError
 from typing import Optional
 
 from tools.retry import with_retry
 
 logger = logging.getLogger(__name__)
 
+_sleep = time.sleep
+
+def _history(ticker: str, **kwargs) -> pd.DataFrame:
+    """
+    Ticker.history with retries on transient errors.
+    yfinance hides exceptions by default (returning an empty frame), so they are
+    switched on here; a missing-prices error is a real "no data" answer and is not retried.
+    """
+    hide = yf.config.debug.hide_exceptions
+    yf.config.debug.hide_exceptions = False
+    try:
+        t = yf.Ticker(ticker)
+        return with_retry(lambda: t.history(**kwargs), sleep=_sleep, give_up_on=(YFTickerMissingError,))
+    except YFTickerMissingError:
+        return pd.DataFrame()
+    finally:
+        yf.config.debug.hide_exceptions = hide
+
 def get_previous_close(ticker: str) -> Optional[float]:
     """
        Return previous close for ticker; None if unavailable.
     """
     try:
-        t = yf.Ticker(ticker)
-        info = with_retry(lambda: t.history(period="2d", interval="1d"))
+        info = _history(ticker, period="2d", interval="1d")
         if info is None or info.empty:
             return None
         if len(info) >= 2:
@@ -35,10 +55,10 @@ def get_intraday_price_at(ticker: str, target_hhmm: str, timezone_str: str = "Am
         now_local = datetime.now(tz)
         target_h, target_m = map(int, target_hhmm.split(":"))
         target_dt = now_local.replace(hour=target_h, minute=target_m, second=0, microsecond=0)
-        df = with_retry(lambda: yf.download(tickers=ticker, period="1d", interval="1m", auto_adjust=False, progress=False))
+        df = _history(ticker, period="1d", interval="1m", auto_adjust=False)
         if df is None or df.empty:
             # retry with 5m bars
-            df = with_retry(lambda: yf.download(tickers=ticker, period="5d", interval="5m", auto_adjust=False, progress=False))
+            df = _history(ticker, period="5d", interval="5m", auto_adjust=False)
             if df is None or df.empty:
                 return None
 
@@ -52,7 +72,7 @@ def get_intraday_price_at(ticker: str, target_hhmm: str, timezone_str: str = "Am
 
         close = df_until["Close"]
         if close.ndim > 1:
-            # yf.download returns (Price, Ticker) MultiIndex columns even for one ticker
+            # guard against (Price, Ticker) MultiIndex columns as returned by yf.download
             close = close.iloc[:, 0]
         ret = float(close.iloc[-1])
         return ret
@@ -65,8 +85,9 @@ def get_lookback_change_pct(ticker: str, days: int) -> Optional[float]:
     percent change of the latest daily close vs the close `days` trading days earlier; None if not enough data.
     """
     try:
-        t = yf.Ticker(ticker)
-        hist = with_retry(lambda: t.history(period=f"{days + 5}d", interval="1d"))
+        # `days` counts trading days; ask for enough calendar days to cover weekends and holidays
+        start = date.today() - timedelta(days=int(days * 1.5) + 10)
+        hist = _history(ticker, start=start, interval="1d")
         if hist is None or hist.empty or len(hist) < days + 1:
             return None
         closes = hist["Close"]

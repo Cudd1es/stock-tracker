@@ -39,3 +39,12 @@ def test_interval_mode_uses_now(monkeypatch):
 def test_daily_mode_uses_schedule_time():
     rules = {"schedule_mode": "daily", "schedule_time": "16:10"}
     assert agent.target_time_for(rules, ZoneInfo("UTC")) == "16:10"
+
+
+def test_scheduled_job_failure_does_not_propagate(monkeypatch, caplog):
+    def boom(*a, **k):
+        raise RuntimeError("bad run")
+
+    monkeypatch.setattr(agent, "run_once", boom)
+    agent.run_scheduled({"tickers": ["TSLA"]}, {})  # must not raise
+    assert "bad run" in caplog.text

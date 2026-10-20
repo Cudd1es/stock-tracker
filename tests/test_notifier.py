@@ -33,3 +33,26 @@ def test_fallback_prints_to_console(monkeypatch, capsys):
     monkeypatch.setattr(notifier, "send_discord", lambda *a, **k: False)
     notifier.notify("discord", "hello", discord_webhook="u")
     assert "hello" in capsys.readouterr().out
+
+
+WEBHOOK = "https://discord.com/api/webhooks/1/SECRETTOKEN"
+
+
+def test_http_error_does_not_log_webhook(monkeypatch, caplog):
+    class LeakyResp(FakeResp):
+        def raise_for_status(self):
+            raise requests.HTTPError(f"404 Client Error: Not Found for url: {WEBHOOK}")
+
+    monkeypatch.setattr(notifier.requests, "post", lambda *a, **k: LeakyResp(404))
+    assert notifier.send_discord(WEBHOOK, "hi", sleep=lambda s: None) is False
+    assert "SECRETTOKEN" not in caplog.text
+    assert "404" in caplog.text
+
+
+def test_connection_error_does_not_log_webhook(monkeypatch, caplog):
+    def refuse(*a, **k):
+        raise requests.ConnectionError(f"Max retries exceeded with url: {WEBHOOK}")
+
+    monkeypatch.setattr(notifier.requests, "post", refuse)
+    assert notifier.send_discord(WEBHOOK, "hi", sleep=lambda s: None) is False
+    assert "SECRETTOKEN" not in caplog.text

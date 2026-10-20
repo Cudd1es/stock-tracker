@@ -26,3 +26,15 @@ def test_raises_after_exhausted():
     with pytest.raises(ValueError):
         with_retry(always_fails, sleep=lambda s: None)
     assert len(calls) == 3
+
+
+def test_give_up_on_does_not_retry():
+    calls = []
+
+    def missing():
+        calls.append(1)
+        raise KeyError("gone")
+
+    with pytest.raises(KeyError):
+        with_retry(missing, sleep=lambda s: None, give_up_on=(KeyError,))
+    assert len(calls) == 1

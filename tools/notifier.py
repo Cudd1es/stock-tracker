@@ -21,8 +21,13 @@ def send_discord(webhook_url: str, content: str, mention_id: Optional[str] = Non
     }
 
     def post():
-        resp = requests.post(webhook_url, json=payload, timeout=10)
-        resp.raise_for_status()
+        # requests' error messages embed the webhook url (which carries the token), so never surface them
+        try:
+            resp = requests.post(webhook_url, json=payload, timeout=10)
+        except requests.RequestException as e:
+            raise RuntimeError(f"discord request failed ({type(e).__name__})") from None
+        if resp.status_code >= 400:
+            raise RuntimeError(f"discord returned HTTP {resp.status_code}")
 
     try:
         with_retry(post, sleep=sleep)

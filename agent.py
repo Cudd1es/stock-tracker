@@ -133,6 +133,15 @@ def _execute_run(cfg_rules: dict, cfg_global: dict, now_iso: str) -> List[str]:
     notify(method, "[DAILY BRIEF]\n" + brief, discord_webhook=webhook, mention_id=mention_id)
     return skipped
 
+def run_scheduled(cfg_rules: dict, cfg_global: dict) -> None:
+    """
+    run_once for the long-running scheduler: one failed run is logged, not fatal.
+    """
+    try:
+        run_once(cfg_rules, cfg_global)
+    except Exception:
+        logger.exception("scheduled run failed; will try again at the next slot")
+
 def run_scheduler(cfg_rules: dict, cfg_global: dict) -> None:
     """
     scheduled jobs according to schedule_time or interval
@@ -151,11 +160,11 @@ def run_scheduler(cfg_rules: dict, cfg_global: dict) -> None:
     if mode == "interval":
         interval = int(cfg_rules.get("interval_minutes", default_interval))
         print(f"[SCHEDULE] {interval} minutes interval")
-        schedule.every(interval).minutes.do(run_once, cfg_rules=cfg_rules, cfg_global=cfg_global)
+        schedule.every(interval).minutes.do(run_scheduled, cfg_rules=cfg_rules, cfg_global=cfg_global)
     else:
         at_time = cfg_rules.get("schedule_time", default_at_time)
         print(f"[SCHEDULE] daily at {at_time} ({tz})")
-        schedule.every().day.at(at_time, tz).do(run_once, cfg_rules=cfg_rules, cfg_global=cfg_global)
+        schedule.every().day.at(at_time, tz).do(run_scheduled, cfg_rules=cfg_rules, cfg_global=cfg_global)
 
     try:
         while True:
@@ -188,5 +197,5 @@ if __name__ == "__main__":
     if args.single: # run for 1 round
         run_once(rules, base_cfg)
     else: # run in schedule
-        run_once(rules, base_cfg)
+        run_scheduled(rules, base_cfg)
         run_scheduler(rules, base_cfg)
