@@ -4,6 +4,8 @@ from zoneinfo import ZoneInfo
 import yfinance as yf
 from typing import Optional
 
+from tools.retry import with_retry
+
 logger = logging.getLogger(__name__)
 
 def get_previous_close(ticker: str) -> Optional[float]:
@@ -12,7 +14,7 @@ def get_previous_close(ticker: str) -> Optional[float]:
     """
     try:
         t = yf.Ticker(ticker)
-        info = t.history(period="2d", interval="1d")
+        info = with_retry(lambda: t.history(period="2d", interval="1d"))
         if info is None or info.empty:
             return None
         if len(info) >= 2:
@@ -33,10 +35,10 @@ def get_intraday_price_at(ticker: str, target_hhmm: str, timezone_str: str = "Am
         now_local = datetime.now(tz)
         target_h, target_m = map(int, target_hhmm.split(":"))
         target_dt = now_local.replace(hour=target_h, minute=target_m, second=0, microsecond=0)
-        df = yf.download(tickers=ticker, period="1d", interval="1m", auto_adjust=False, progress=False)
+        df = with_retry(lambda: yf.download(tickers=ticker, period="1d", interval="1m", auto_adjust=False, progress=False))
         if df is None or df.empty:
             # retry with 5m bars
-            df = yf.download(tickers=ticker, period="5d", interval="5m", auto_adjust=False, progress=False)
+            df = with_retry(lambda: yf.download(tickers=ticker, period="5d", interval="5m", auto_adjust=False, progress=False))
             if df is None or df.empty:
                 return None
 
