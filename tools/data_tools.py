@@ -56,6 +56,24 @@ def get_intraday_price_at(ticker: str, target_hhmm: str, timezone_str: str = "Am
         logger.warning("failed to fetch intraday price for %s", ticker, exc_info=True)
         return None
 
+def get_lookback_change_pct(ticker: str, days: int) -> Optional[float]:
+    """
+    percent change of the latest daily close vs the close `days` trading days earlier; None if not enough data.
+    """
+    try:
+        t = yf.Ticker(ticker)
+        hist = with_retry(lambda: t.history(period=f"{days + 5}d", interval="1d"))
+        if hist is None or hist.empty or len(hist) < days + 1:
+            return None
+        closes = hist["Close"]
+        base = float(closes.iloc[-(days + 1)])
+        if base == 0:
+            return None
+        return (float(closes.iloc[-1]) - base) / base * 100.0
+    except Exception:
+        logger.warning("failed to fetch %d-day history for %s", days, ticker, exc_info=True)
+        return None
+
 def get_change_pct_vs_prev_close(ticker: str, price_now: float) -> Optional[float]:
     """
     Compute percentage change versus previous close.

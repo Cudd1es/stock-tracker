@@ -8,7 +8,7 @@ import argparse
 import logging
 
 from parser import parse_user_requirement
-from tools.data_tools import get_intraday_price_at, get_previous_close
+from tools.data_tools import get_intraday_price_at, get_previous_close, get_lookback_change_pct
 from tools.storage import init_db, save_price
 from tools.notifier import notify
 from tools.reporter import fetch_news_headlines, generate_brief
@@ -45,6 +45,8 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
     model = default_model
     threshold = float(cfg_rules["alert_threshold"])
     language = cfg_rules.get("report_language", default_language)
+    style = cfg_rules.get("report_style", "summary")
+    lookback_days = int(cfg_rules.get("lookback_days", 5))
 
     snapshot = []
     news_map = {}
@@ -65,6 +67,7 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
             "price_now": price_now,
             "prev_close": prev_close,
             "change_pct": change_pct,
+            "lookback_change_pct": get_lookback_change_pct(t, lookback_days),
         })
 
 
@@ -87,7 +90,7 @@ def run_once(cfg_rules: dict, cfg_global: dict) -> None:
             alert_lines.append(f"{row['ticker']} moved {row['change_pct']:.2f}% (now {row['price_now']:.2f})")
 
     # brief
-    brief = generate_brief(model, snapshot, news_map, threshold, language)
+    brief = generate_brief(model, snapshot, news_map, threshold, language, style, lookback_days)
 
     # notify
     webhook = os.getenv("DISCORD_WEBHOOK_URL")
