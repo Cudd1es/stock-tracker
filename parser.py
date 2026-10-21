@@ -28,7 +28,7 @@ ALLOWED_REPORT_STYLES = [
 ALLOWED_LANGUAGES = [
     "en",
     "zh",
-    "jp"
+    "ja"
 ]
 
 PARSER_PROMPT = """You are a strict configuration extractor for a stock-tracking agent.
@@ -43,7 +43,7 @@ You MUST return ONLY a valid JSON object (no extra text, no code fences) matchin
   "report_style": "summary|detailed",    // OPTIONAL
   "news_enabled": "boolean",             // OPTIONAL
   "lookback_days": "integer"             // OPTIONAL, days to look back for trends (1..60)
-  "report_language": "zh|en|jp"            // OPTIONAL, language in the report
+  "report_language": "zh|en|ja"            // OPTIONAL, language in the report
   "schedule_mode": "daily|interval",   // OPTIONAL, default "daily"
   "interval_minutes": "integer",       // OPTIONAL, required when schedule_mode="interval"
 }}
@@ -153,12 +153,12 @@ def _validate_and_fix(cfg: Dict[str, Any]) -> Dict[str, Any]:
         lookback = DEFAULTS["lookback_days"]
 
     # report_language
-    lang = (cfg.get("report_language", DEFAULTS["report_language"])).lower().strip()
+    lang = str(cfg.get("report_language") or DEFAULTS["report_language"]).lower().strip()
     if lang not in ALLOWED_LANGUAGES:
         lang = DEFAULTS["report_language"]
 
     # schedule_mode & interval_minutes
-    mode = (cfg.get("schedule_mode") or "daily").lower().strip()
+    mode = str(cfg.get("schedule_mode") or "daily").lower().strip()
     if mode not in ("daily", "interval"):
         mode = "daily"
 

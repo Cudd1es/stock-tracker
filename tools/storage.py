@@ -29,9 +29,7 @@ def get_conn() -> sqlite3.Connection:
 def init_db() -> None:
     conn = get_conn()
     with conn:
-        for stmt in DDL.strip().split(";\n\n"):
-            if stmt.strip():
-                conn.execute(stmt)
+        conn.executescript(DDL)
     conn.close()
 
 def save_price(ticker: str, ts_iso: str, price: float, source: str = "yfinance") -> None:
@@ -40,5 +38,14 @@ def save_price(ticker: str, ts_iso: str, price: float, source: str = "yfinance")
         conn.execute(
             "INSERT INTO prices (ticker, ts, price, source) VALUES (?, ?, ?, ?)",
             (ticker, ts_iso, price, source)
+        )
+    conn.close()
+
+def record_run(run_ts: str, status: str, note: Optional[str] = None) -> None:
+    conn = get_conn()
+    with conn:
+        conn.execute(
+            "INSERT INTO runs (run_ts, status, note) VALUES (?, ?, ?)",
+            (run_ts, status, note)
         )
     conn.close()

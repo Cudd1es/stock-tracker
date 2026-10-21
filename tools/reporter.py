@@ -1,6 +1,9 @@
+import logging
 from typing import Dict, List, Optional
 import yfinance as yf
 from llm_agent import ask_llm
+
+logger = logging.getLogger(__name__)
 
 def fetch_news_headlines(ticker: str, topk: int = 3) -> List[Dict[str, str]]:
     """
@@ -12,6 +15,7 @@ def fetch_news_headlines(ticker: str, topk: int = 3) -> List[Dict[str, str]]:
         t = yf.Ticker(ticker)
         items = t.news or []
     except Exception:
+        logger.warning("failed to fetch news for %s", ticker, exc_info=True)
         return out
 
     for it in items:
@@ -55,16 +59,16 @@ def fetch_news_headlines(ticker: str, topk: int = 3) -> List[Dict[str, str]]:
 
     return deduped[:topk]
 
-def generate_brief(model: str, snapshot: List[Dict[str, Optional[float]]], news_map: Dict[str, List[Dict[str, str]]], threshold: float, language: str = "zh") -> str:
+def generate_brief(model: str, snapshot: List[Dict[str, Optional[float]]], news_map: Dict[str, List[Dict[str, str]]], threshold: float, language: str = "zh", style: str = "summary", lookback_days: int = 5) -> str:
     """
     ask llm to generate a brief report
-    snapshot: list of {ticker, price_now, prev_close, change_pct}
+    snapshot: list of {ticker, price_now, prev_close, change_pct, lookback_change_pct}
     news_map: ticker -> list of {title, link}
     """
     language_dict = {
         "zh": "zh-CN",
         "en": "en",
-        "jp": "jp-JP",
+        "ja": "ja-JP",
     }
     lines = []
     for row in snapshot:
@@ -72,19 +76,26 @@ def generate_brief(model: str, snapshot: List[Dict[str, Optional[float]]], news_
         cp = row["change_pct"]
         pn = row["price_now"]
         pv = row["prev_close"]
-        lines.append(f"{t}: now={pn:.2f}, prev_close={pv:.2f}, change={cp:.2f}%")
+        lc = row.get("lookback_change_pct")
+        lc_text = f"{lc:.2f}%" if lc is not None else "n/a"
+        lines.append(f"{t}: now={pn:.2f}, prev_close={pv:.2f}, change={cp:.2f}%, {lookback_days}d_change={lc_text}")
         news = news_map.get(t, [])
         for n in news:
             lines.append(f"  - {n['title']} ({n.get('link', '')})")
     context = "\n".join(lines)
-    lang_name = language_dict[language]
+    lang_name = language_dict.get(language, "en")
 
-    prompt = f"""Write a concise end-of-day style brief (max 6 bullet points) for the following tickers.
+    if style == "detailed":
+        task = f"Write one short paragraph per ticker covering price move, {lookback_days}-day trend and the news, then a one-line summary."
+    else:
+        task = "Write a concise end-of-day style brief (max 6 bullet points) for the following tickers, with a one-line summary at the end."
+
+    prompt = f"""{task}
 Emphasize any move beyond ±{threshold:.1f}% . Be neutral and factual. Avoid investment advice.
 
 DATA:
 {context}
 
-Output in {lang_name}, use clear bullets and a one-line summary at the end.
+Output in {lang_name}.
 """
     return ask_llm(prompt, model=model)

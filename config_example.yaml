@@ -1,9 +1,6 @@
-# config.yaml
+# config_example.yaml
 openai_model: gpt-4o
 timezone: America/Toronto
-
-# Fallback defaults if user doesn't specify
-defaults:
-  alert_threshold: 5.0
-  schedule_time: "16:30"
-  notify_method: "console"
+alert_threshold: 5.0
+schedule_time: "16:30"
+notify_method: "console"

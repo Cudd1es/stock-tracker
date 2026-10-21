@@ -1,5 +1,6 @@
 openai>=1.25.0
 pyyaml
-schedule
+schedule>=1.2.2
 yfinance
 python-dotenv
+requests
